@@ -1,9 +1,9 @@
 {
   "site": {
     "title": "",
-    "subtitle": "اسعار الذهب والمعادن",
+    "subtitle": "",
     "announcement": "",
-    "accent": "#000000"
+    "accent": "#ff0000"
   },
   "metals": {
     "XAU": {
