@@ -1,9 +1,9 @@
 {
   "site": {
     "title": "",
-    "subtitle": "لحظة بلحظة",
+    "subtitle": "",
     "announcement": "",
-    "accent": ""
+    "accent": "#ffff00"
   },
   "metals": {
     "XAU": {
