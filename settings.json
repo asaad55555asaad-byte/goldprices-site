@@ -1,0 +1,27 @@
+{
+  "site": {
+    "title": "",
+    "subtitle": "اسعار الذهب والمعادن",
+    "announcement": "",
+    "accent": "#000000"
+  },
+  "metals": {
+    "XAU": {
+      "mode": "auto",
+      "manual": 0,
+      "visible": true
+    },
+    "XAG": {
+      "mode": "auto",
+      "manual": 0,
+      "visible": true
+    },
+    "XPT": {
+      "mode": "auto",
+      "manual": 0,
+      "visible": true
+    }
+  },
+  "extra": [],
+  "news": []
+}
