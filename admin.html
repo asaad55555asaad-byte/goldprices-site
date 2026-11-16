@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>لوحة التحكم</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1a1c22;--muted:#5d6370;--line:#dde0e6;--gold:#b8860b;--ok:#157f3b;--err:#c0262d;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#14161b;--card:#1d2027;--ink:#f1f2f5;--muted:#a3a9b6;--line:#2e323c;--gold:#e0b84a;--ok:#4cc27a;--err:#ff6b70}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,Arial,sans-serif;line-height:1.6;padding:16px;max-width:680px;margin-inline:auto}
+h1{font-size:1.25rem;margin:4px 0 12px}h3{margin:0 0 4px;color:var(--gold);font-size:1.05rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:.88rem;color:var(--muted);margin:8px 0 3px}
+input,select,textarea{width:100%;font:inherit;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+input[type=color]{height:42px;padding:3px}input[type=checkbox]{width:auto}
+.ltr{direction:ltr;text-align:left}
+button{font:inherit;border:0;border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--ink);color:var(--bg);font-weight:700}
+button.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.del{background:transparent;color:var(--err);border:1px solid var(--line);padding:6px 12px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+nav{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+nav button{flex:none;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+nav button.on{background:var(--ink);color:var(--bg)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--ink)}
+#msg{margin:10px 0;min-height:1.4em}.ok{color:var(--ok)}.err{color:var(--err)}
+small{color:var(--muted)}
+.sticky{position:sticky;bottom:0;background:var(--bg);padding:10px 0}
+</style>
+</head>
+<body>
+<h1>لوحة التحكم</h1>
+
+<div class="card" id="login">
+  <label for="token">مفتاح GitHub (Token)</label>
+  <input id="token" class="ltr" type="password" placeholder="github_pat_..." autocomplete="off">
+  <small>يُحفظ في متصفحك فقط. الصلاحية المطلوبة: Contents read and write.</small>
+  <div class="bar"><button id="loadBtn">دخول وتحميل</button><button class="sec" id="forgetBtn">نسيان المفتاح</button></div>
+</div>
+
+<div id="app" hidden>
+  <nav id="tabs">
+    <button data-tab="prices" class="on">الأسعار</button>
+    <button data-tab="news">الأخبار</button>
+    <button data-tab="site">شكل الموقع</button>
+  </nav>
+
+  <section id="tab-prices">
+    <div id="metals"></div>
+    <h3>معادن إضافية</h3>
+    <div id="extra"></div>
+    <button class="sec" data-act="addExtra">+ إضافة معدن</button>
+    <p><small>الأسعار بالدولار للأونصة. «تلقائي» يترك السعر الحي، و«يدوي» يثبّت قيمتك ولا يمسحها التحديث التلقائي.</small></p>
+  </section>
+
+  <section id="tab-news" hidden>
+    <div id="newsList"></div>
+    <button class="sec" data-act="addNews">+ خبر جديد</button>
+    <p><small>الأخبار المثبتة تظهر أول القائمة، وما يمسحها تحديث الأخبار التلقائي.</small></p>
+  </section>
+
+  <section id="tab-site" hidden>
+    <div class="card">
+      <label>عنوان الموقع</label><input data-site="title" placeholder="GoldPrices">
+      <label>الوصف تحت العنوان</label><input data-site="subtitle">
+      <label>رسالة أعلى الصفحة (اتركها فاضية لو ما تبي)</label><textarea rows="2" data-site="announcement"></textarea>
+      <label>اللون الرئيسي</label><input type="color" data-site="accent">
+      <div class="bar"><button class="sec" data-act="resetAccent">إرجاع اللون الافتراضي</button></div>
+      <small id="accentState"></small>
+    </div>
+  </section>
+
+  <div class="sticky"><div class="bar" style="margin:0"><button id="saveBtn">حفظ</button><button class="sec" id="reloadBtn">إعادة تحميل</button></div></div>
+</div>
+<div id="msg" role="status"></div>
+
+<script>
+const OWNER="asaad55555asaad-byte", REPO="goldprices-site", PATH="settings.json", BRANCH="main";
+const api=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
+const NAMES={XAU:"الذهب",XAG:"الفضة",XPT:"البلاتين"};
+const $=id=>document.getElementById(id);
+let S=blank(), sha=null;
+
+function blank(){return {site:{title:"",subtitle:"",announcement:"",accent:""},metals:{XAU:{mode:"auto",manual:0,visible:true},XAG:{mode:"auto",manual:0,visible:true},XPT:{mode:"auto",manual:0,visible:true}},extra:[],news:[]};}
+function say(t,c){const m=$("msg");m.textContent=t;m.className=c||"";}
+const hdr=()=>({Authorization:"Bearer "+$("token").value.trim(),Accept:"application/vnd.github+json"});
+const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,"")),c=>c.charCodeAt(0)));
+const b64e=s=>{let b="";new TextEncoder().encode(s).forEach(x=>b+=String.fromCharCode(x));return btoa(b);};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+$("token").value=localStorage.getItem("gh_token")||"";
+
+function merge(d){
+  const b=blank();
+  S={site:Object.assign(b.site,d.site||{}),metals:b.metals,extra:Array.isArray(d.extra)?d.extra:[],news:Array.isArray(d.news)?d.news:[]};
+  if(d.metals&&!Array.isArray(d.metals))Object.keys(b.metals).forEach(k=>{if(d.metals[k])Object.assign(S.metals[k],d.metals[k])});
+}
+async function load(){
+  const tk=$("token").value.trim();
+  if(!tk){say("أدخل المفتاح أولاً.","err");return;}
+  localStorage.setItem("gh_token",tk); say("جاري التحميل...");
+  try{
+    const r=await fetch(api+"?ref="+BRANCH+"&t="+Date.now(),{headers:hdr()});
+    if(r.status===404){S=blank();sha=null;say("ملف الإعدادات جديد. عدّل واضغط حفظ لإنشائه.","ok");}
+    else if(!r.ok){throw new Error(r.status===401?"المفتاح غير صحيح أو منتهي.":"خطأ "+r.status);}
+    else{const j=await r.json();sha=j.sha;merge(JSON.parse(b64d(j.content)));say("تم التحميل.","ok");}
+    $("app").hidden=false;render();
+  }catch(e){say(e.message,"err");}
+}
+
+function render(){
+  $("metals").innerHTML=Object.keys(NAMES).map(k=>{const m=S.metals[k];return `
+    <div class="card"><h3>${NAMES[k]}</h3>
+      <div class="grid2">
+        <div><label>الوضع</label><select data-m="${k}" data-f="mode"><option value="auto" ${m.mode==="auto"?"selected":""}>تلقائي</option><option value="manual" ${m.mode==="manual"?"selected":""}>يدوي</option></select></div>
+        <div><label>السعر اليدوي (دولار/أونصة)</label><input class="ltr" type="number" step="any" data-m="${k}" data-f="manual" value="${esc(m.manual)}"></div>
+      </div>
+      <label class="chk"><input type="checkbox" data-m="${k}" data-f="visible" ${m.visible?"checked":""}> ظاهر في الموقع</label>
+    </div>`;}).join("");
+  $("extra").innerHTML=S.extra.map((m,i)=>`
+    <div class="card">
+      <div class="grid2">
+        <div><label>الاسم</label><input data-l="extra" data-i="${i}" data-f="name" value="${esc(m.name)}"></div>
+        <div><label>الرمز (إنجليزي)</label><input class="ltr" data-l="extra" data-i="${i}" data-f="id" value="${esc(m.id)}" placeholder="XPD"></div>
+      </div>
+      <label>السعر (دولار/أونصة)</label><input class="ltr" type="number" step="any" data-l="extra" data-i="${i}" data-f="price" value="${esc(m.price)}">
+      <label class="chk"><input type="checkbox" data-l="extra" data-i="${i}" data-f="visible" ${m.visible!==false?"checked":""}> ظاهر في الموقع</label>
+      <div class="bar"><button class="del" data-act="delExtra" data-i="${i}">حذف</button></div>
+    </div>`).join("")||'<p><small>ما فيه معادن إضافية.</small></p>';
+  $("newsList").innerHTML=S.news.map((n,i)=>`
+    <div class="card">
+      <label>العنوان</label><input data-l="news" data-i="${i}" data-f="title" value="${esc(n.title)}">
+      <label>سطر تحت العنوان (اختياري)</label><input data-l="news" data-i="${i}" data-f="text" value="${esc(n.text)}">
+      <div class="grid2">
+        <div><label>الرابط (اختياري)</label><input class="ltr" data-l="news" data-i="${i}" data-f="link" value="${esc(n.link)}"></div>
+        <div><label>التاريخ</label><input class="ltr" type="date" data-l="news" data-i="${i}" data-f="date" value="${esc(n.date)}"></div>
+      </div>
+      <div class="bar"><button class="del" data-act="delNews" data-i="${i}">حذف</button></div>
+    </div>`).join("")||'<p><small>ما فيه أخبار مثبتة.</small></p>';
+  document.querySelectorAll("[data-site]").forEach(el=>{const v=S.site[el.dataset.site];el.value=el.type==="color"?(v||"#d4af37"):(v||"");});
+  $("accentState").textContent=S.site.accent?"لون مخصص: "+S.site.accent:"اللون الافتراضي للموقع";
+}
+
+document.addEventListener("input",e=>{
+  const el=e.target,conv=()=>el.type==="checkbox"?el.checked:el.type==="number"?(el.value===""?0:Number(el.value)):el.value;
+  if(el.dataset.site){S.site[el.dataset.site]=el.value;if(el.dataset.site==="accent")$("accentState").textContent="لون مخصص: "+el.value;return;}
+  if(el.dataset.m){S.metals[el.dataset.m][el.dataset.f]=conv();return;}
+  if(el.dataset.l){S[el.dataset.l][+el.dataset.i][el.dataset.f]=conv();}
+});
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tab]"),b=e.target.closest("[data-act]");
+  if(t){document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===t));["prices","news","site"].forEach(k=>$("tab-"+k).hidden=k!==t.dataset.tab);return;}
+  if(!b)return;
+  const a=b.dataset.act,i=+b.dataset.i;
+  if(a==="addExtra")S.extra.push({id:"",name:"",price:0,visible:true});
+  if(a==="delExtra"&&confirm("حذف هذا المعدن؟"))S.extra.splice(i,1);
+  if(a==="addNews")S.news.unshift({title:"",text:"",link:"",date:new Date().toISOString().slice(0,10)});
+  if(a==="delNews"&&confirm("حذف هذا الخبر؟"))S.news.splice(i,1);
+  if(a==="resetAccent")S.site.accent="";
+  render();
+});
+
+async function save(){
+  say("جاري الحفظ...");
+  try{
+    const body={message:"Update settings from admin panel",content:b64e(JSON.stringify(S,null,2)+"\n"),branch:BRANCH};
+    if(sha)body.sha=sha;
+    const r=await fetch(api,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},hdr()),body:JSON.stringify(body)});
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(r.status===409||r.status===422?"الملف تغيّر. اضغط إعادة تحميل ثم عدّل من جديد.":r.status===403||r.status===404?"المفتاح ما عنده صلاحية كتابة.":(j.message||"خطأ "+r.status));}
+    sha=(await r.json()).content.sha;
+    say("تم الحفظ. التغييرات تظهر على الموقع خلال دقائق.","ok");
+  }catch(e){say(e.message,"err");}
+}
+$("loadBtn").onclick=load;$("reloadBtn").onclick=load;$("saveBtn").onclick=save;
+$("forgetBtn").onclick=()=>{localStorage.removeItem("gh_token");$("token").value="";$("app").hidden=true;say("تم مسح المفتاح.","ok");};
+</script>
+</body>
+</html>
