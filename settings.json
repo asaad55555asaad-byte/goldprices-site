@@ -3,7 +3,7 @@
     "title": "",
     "subtitle": "",
     "announcement": "",
-    "accent": "#ff00ff"
+    "accent": "#ffff00"
   },
   "metals": {
     "XAU": {
@@ -23,5 +23,12 @@
     }
   },
   "extra": [],
-  "news": []
+  "news": [
+    {
+      "title": "",
+      "text": "",
+      "link": "",
+      "date": "2026-11-17"
+    }
+  ]
 }
